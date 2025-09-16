@@ -86,7 +86,7 @@ def cleanup_and_get_valid_users():
 @app.route('/')
 def home():
     """Halaman utama untuk memastikan API berjalan."""
-    return "API Premium Email Manager is running. Made with <3"
+    return "BELI DONG ANJING, MASAK GAK PUNYA DUIT TOLOL LU BABI 😂"
 
 
 @app.route('/add/premium', methods=['GET'])
