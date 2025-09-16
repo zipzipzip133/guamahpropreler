@@ -9,7 +9,7 @@ app = Flask(__name__)
 # --- Konfigurasi dan Variabel Global ---
 
 # Kunci API rahasia Anda. Ganti dengan kunci yang lebih kompleks.
-SECRET_KEY = "@!wary@yo$@no!!!@#$&"
+SECRET_KEY = "akusayangvikaselamanya"
 
 # Lokasi file data. Di Vercel, hanya direktori /tmp yang bisa ditulis.
 # Kita akan menyalin data awal ke sini jika file belum ada.
