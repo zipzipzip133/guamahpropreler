@@ -1,18 +1,17 @@
 import os
 import json
 from flask import Flask, request, jsonify
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone # <-- SUDAH DIPERBAIKI
 
 # Inisialisasi aplikasi Flask
 app = Flask(__name__)
 
 # --- Konfigurasi dan Variabel Global ---
 
-# Kunci API rahasia Anda. Ganti dengan kunci yang lebih kompleks.
+# Kunci API rahasia Anda
 SECRET_KEY = "akusayangvikaselamanya"
 
-# Lokasi file data. Di Vercel, hanya direktori /tmp yang bisa ditulis.
-# Kita akan menyalin data awal ke sini jika file belum ada.
+# Lokasi file data
 DATA_FILE_PATH = '/tmp/premium_users.json'
 INITIAL_DATA_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'premium_users.json')
 
@@ -22,19 +21,23 @@ INITIAL_DATA_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'da
 def load_data():
     """Memuat data dari file JSON di /tmp. Jika tidak ada, salin dari data awal."""
     if not os.path.exists(DATA_FILE_PATH):
-        # Jika file di /tmp belum ada, salin dari file data/ asli
-        with open(INITIAL_DATA_PATH, 'r') as f_initial:
-            initial_data = json.load(f_initial)
-        with open(DATA_FILE_PATH, 'w') as f_tmp:
-            json.dump(initial_data, f_tmp, indent=2)
-        return initial_data
-    
-    # Jika file sudah ada, baca dari /tmp
+        if os.path.exists(INITIAL_DATA_PATH):
+            with open(INITIAL_DATA_PATH, 'r') as f_initial:
+                initial_data = json.load(f_initial)
+            with open(DATA_FILE_PATH, 'w') as f_tmp:
+                json.dump(initial_data, f_tmp, indent=2)
+            return initial_data
+        else:
+            # Jika file data awal tidak ada, buat struktur default
+            default_data = {"premium_users": []}
+            with open(DATA_FILE_PATH, 'w') as f_tmp:
+                json.dump(default_data, f_tmp, indent=2)
+            return default_data
+
     try:
         with open(DATA_FILE_PATH, 'r') as f:
             return json.load(f)
     except (IOError, json.JSONDecodeError):
-        # Jika terjadi error saat membaca, kembalikan struktur data kosong
         return {"premium_users": []}
 
 def save_data(data):
@@ -54,7 +57,6 @@ def parse_duration(duration_str):
     elif duration_str.endswith('mon'):
         try:
             months = int(duration_str.replace('mon', ''))
-            # Perkiraan kasar: 1 bulan = 30 hari
             return timedelta(days=months * 30)
         except ValueError:
             return None
@@ -63,15 +65,15 @@ def parse_duration(duration_str):
 def cleanup_and_get_valid_users():
     """Membersihkan email yang sudah kedaluwarsa dan mengembalikan daftar yang valid."""
     data = load_data()
-    now = datetime.now()
+    # Gunakan waktu UTC saat ini untuk perbandingan yang akurat
+    now = datetime.now(timezone.utc) # <-- SUDAH DIPERBAIKI
     
-    # Filter hanya user yang tanggal kedaluwarsanya masih di masa depan
     valid_users = [
         user for user in data.get("premium_users", [])
-        if datetime.fromisoformat(user['expires_at']) > now
+        # Pastikan 'expires_at' ada sebelum membandingkan
+        if 'expires_at' in user and datetime.fromisoformat(user['expires_at']) > now
     ]
 
-    # Jika ada perubahan (ada user yang dihapus), simpan kembali file data
     if len(valid_users) < len(data.get("premium_users", [])):
         data["premium_users"] = valid_users
         save_data(data)
@@ -90,17 +92,14 @@ def home():
 @app.route('/add/premium', methods=['GET'])
 def add_premium_user():
     """Endpoint untuk menambah atau memperbarui email premium."""
-    # Ambil parameter dari URL
     key = request.args.get('key')
     email = request.args.get('addemail')
     duration_str = request.args.get('day')
     user_type = request.args.get('type')
 
-    # Validasi API Key
     if key != SECRET_KEY:
-        return jsonify({"status": "error", "message": "Invalid API Key"}), 401
+        return jsonify({"status": "error", "message": "apa coba yatim 😂"}), 401
 
-    # Validasi parameter yang wajib ada
     if not all([email, duration_str, user_type]):
         return jsonify({"status": "error", "message": "Missing parameters. Required: addemail, day, type, key"}), 400
 
@@ -108,13 +107,13 @@ def add_premium_user():
     if not duration:
         return jsonify({"status": "error", "message": "Invalid duration format. Use 'Xday' or 'Xmon'."}), 400
 
-    # Hitung tanggal kedaluwarsa
-    expires_at = datetime.now() + duration
+    # Gunakan waktu UTC untuk semua perhitungan
+    now_utc = datetime.now(timezone.utc) # <-- SUDAH DIPERBAIKI
+    expires_at = now_utc + duration # <-- SUDAH DIPERBAIKI
     
     data = load_data()
     users = data.get("premium_users", [])
 
-    # Cek apakah email sudah ada, jika ya, perbarui datanya (update)
     user_found = False
     for user in users:
         if user['email'] == email:
@@ -124,12 +123,11 @@ def add_premium_user():
             user_found = True
             break
     
-    # Jika email belum ada, tambahkan sebagai user baru
     if not user_found:
         users.append({
             "email": email,
             "type": user_type,
-            "added_at": datetime.now().isoformat(),
+            "added_at": now_utc.isoformat(), # <-- SUDAH DIPERBAIKI
             "expires_at": expires_at.isoformat(),
             "duration": duration_str
         })
@@ -155,7 +153,7 @@ def delete_premium_user():
     email_to_delete = request.args.get('delemail')
 
     if key != SECRET_KEY:
-        return jsonify({"status": "error", "message": "Invalid API Key"}), 401
+        return jsonify({"status": "error", "message": "apa coba yatim 😂"}), 401
 
     if not email_to_delete:
         return jsonify({"status": "error", "message": "Missing parameter: delemail"}), 400
@@ -163,10 +161,8 @@ def delete_premium_user():
     data = load_data()
     users = data.get("premium_users", [])
     
-    # Buat daftar baru tanpa email yang ingin dihapus
-    users_after_deletion = [user for user in users if user['email'] != email_to_delete]
+    users_after_deletion = [user for user in users if user.get('email') != email_to_delete]
 
-    # Cek apakah ada email yang benar-benar dihapus
     if len(users_after_deletion) < len(users):
         data["premium_users"] = users_after_deletion
         save_data(data)
@@ -178,15 +174,9 @@ def delete_premium_user():
 @app.route('/list/email/premium.json', methods=['GET'])
 def list_premium_users():
     """Endpoint untuk menampilkan daftar email premium yang masih aktif."""
-    # Fungsi ini akan otomatis membersihkan email kedaluwarsa sebelum menampilkannya
     valid_users = cleanup_and_get_valid_users()
 
     return jsonify({
-        "retrieved_at": datetime.now().isoformat(),
+        "retrieved_at": datetime.now(timezone.utc).isoformat(), # <-- SUDAH DIPERBAIKI
         "active_premium_users": valid_users
     }), 200
-
-# Baris ini penting agar Vercel bisa menjalankan aplikasi Flask
-# (Meskipun Vercel biasanya menggunakan Gunicorn atau server WSGI lainnya)
-if __name__ == "__main__":
-    app.run(debug=True)
