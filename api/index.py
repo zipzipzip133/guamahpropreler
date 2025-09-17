@@ -1,7 +1,7 @@
 import os
 import json
 from flask import Flask, request, jsonify
-from datetime import datetime, timedelta, timezone # <-- SUDAH DIPERBAIKI
+from datetime import datetime, timedelta, timezone
 
 # Inisialisasi aplikasi Flask
 app = Flask(__name__)
@@ -66,15 +66,39 @@ def cleanup_and_get_valid_users():
     """Membersihkan email yang sudah kedaluwarsa dan mengembalikan daftar yang valid."""
     data = load_data()
     # Gunakan waktu UTC saat ini untuk perbandingan yang akurat
-    now = datetime.now(timezone.utc) # <-- SUDAH DIPERBAIKI
+    now = datetime.now(timezone.utc)
     
-    valid_users = [
-        user for user in data.get("premium_users", [])
+    valid_users = []
+    expired_users = []
+    
+    for user in data.get("premium_users", []):
         # Pastikan 'expires_at' ada sebelum membandingkan
-        if 'expires_at' in user and datetime.fromisoformat(user['expires_at']) > now
-    ]
+        if 'expires_at' in user:
+            try:
+                # Konversi string ISO ke datetime dengan timezone awareness
+                expires_at = datetime.fromisoformat(user['expires_at'])
+                # Jika expires_at tidak memiliki timezone, anggap sebagai UTC
+                if expires_at.tzinfo is None:
+                    expires_at = expires_at.replace(tzinfo=timezone.utc)
+                
+                # Debug: print waktu untuk memastikan
+                print(f"Email: {user['email']}, Now: {now}, Expires: {expires_at}, Valid: {expires_at > now}")
+                
+                if expires_at > now:
+                    valid_users.append(user)
+                else:
+                    expired_users.append(user['email'])
+            except (ValueError, TypeError) as e:
+                print(f"Error parsing expires_at for {user['email']}: {e}")
+                # Jika ada error parsing, anggap sebagai expired
+                expired_users.append(user['email'])
+        else:
+            # Jika tidak ada expires_at, anggap sebagai expired
+            expired_users.append(user['email'])
 
-    if len(valid_users) < len(data.get("premium_users", [])):
+    # Hanya simpan jika ada perubahan
+    if expired_users:
+        print(f"Removing expired emails: {expired_users}")
         data["premium_users"] = valid_users
         save_data(data)
 
@@ -108,8 +132,8 @@ def add_premium_user():
         return jsonify({"status": "error", "message": "Invalid duration format. Use 'Xday' or 'Xmon'."}), 400
 
     # Gunakan waktu UTC untuk semua perhitungan
-    now_utc = datetime.now(timezone.utc) # <-- SUDAH DIPERBAIKI
-    expires_at = now_utc + duration # <-- SUDAH DIPERBAIKI
+    now_utc = datetime.now(timezone.utc)
+    expires_at = now_utc + duration
     
     data = load_data()
     users = data.get("premium_users", [])
@@ -127,7 +151,7 @@ def add_premium_user():
         users.append({
             "email": email,
             "type": user_type,
-            "added_at": now_utc.isoformat(), # <-- SUDAH DIPERBAIKI
+            "added_at": now_utc.isoformat(),
             "expires_at": expires_at.isoformat(),
             "duration": duration_str
         })
@@ -177,6 +201,10 @@ def list_premium_users():
     valid_users = cleanup_and_get_valid_users()
 
     return jsonify({
-        "retrieved_at": datetime.now(timezone.utc).isoformat(), # <-- SUDAH DIPERBAIKI
+        "retrieved_at": datetime.now(timezone.utc).isoformat(),
         "active_premium_users": valid_users
     }), 200
+
+
+if __name__ == '__main__':
+    app.run(debug=True)
