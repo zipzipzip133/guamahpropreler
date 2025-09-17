@@ -86,7 +86,7 @@ def cleanup_and_get_valid_users():
 @app.route('/')
 def home():
     """Halaman utama untuk memastikan API berjalan."""
-    return "BELI DONG ANJING, MASAK GAK PUNYA DUIT TOLOL LU BABI 😂"
+    return "BELI PREMIUM DONG TOLOL LU ANJING GAK MODAL KONTOL 🤭🗿"
 
 
 @app.route('/add/premium', methods=['GET'])
@@ -98,7 +98,7 @@ def add_premium_user():
     user_type = request.args.get('type')
 
     if key != SECRET_KEY:
-        return jsonify({"status": "error", "message": "apa coba yatim 😂"}), 401
+        return jsonify({"status": "error", "message": "Invalid api, mau ngapain bang?"}), 401
 
     if not all([email, duration_str, user_type]):
         return jsonify({"status": "error", "message": "Missing parameters. Required: addemail, day, type, key"}), 400
@@ -153,7 +153,7 @@ def delete_premium_user():
     email_to_delete = request.args.get('delemail')
 
     if key != SECRET_KEY:
-        return jsonify({"status": "error", "message": "apa coba yatim 😂"}), 401
+        return jsonify({"status": "error", "message": "Invalid api , mau ngapain bang?"}), 401
 
     if not email_to_delete:
         return jsonify({"status": "error", "message": "Missing parameter: delemail"}), 400
